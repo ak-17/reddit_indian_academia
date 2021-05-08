@@ -32,31 +32,44 @@ class Comment:
         return json.dumps(self, default=lambda o: o.__dict__, 
             sort_keys=True, indent=4)
 
-def getPosts():
-    url = "https://www.reddit.com/r/Indian_Academia/top.json?limit=20"
-    payload={}
-    headers = {
-    'User-agent': 'mybot 0.0',
-    }
-    response = requests.request("GET", url, headers=headers, data=payload)
-
-    responseData = response.json()
-
-    data = responseData['data']
-
+def getPosts(after):
     posts = []
+    dist = 25
+    i = 1
+    while True:
+        print("page no: %d" %(i))
+        url = "https://www.reddit.com/r/Indian_Academia/top.json?t=year"
+        if after!="":
+            url = url + "&after="+after
+        
+        payload={}
+        headers = {
+        'User-agent': 'mybot 0.0',
+        }
+        response = requests.request("GET", url, headers=headers, data=payload)
 
-    for child in data["children"]:
-        childData = child["data"]
-        title = childData["title"]
-        ups = childData['ups']
-        downs = childData['downs']
-        flair = childData['link_flair_text']
-        url = childData['url']
-        body = childData['selftext']
-        post = Post(title,body,url,flair,ups,downs)
-        posts.append(post)
-    
+        responseData = response.json()
+
+        data = responseData['data']
+
+        after = data["after"]
+        
+        for child in data["children"]:
+            childData = child["data"]
+            title = childData["title"]
+            ups = childData['ups']
+            downs = childData['downs']
+            flair = childData['link_flair_text']
+            # url = childData['url'][:-1]
+            url = "https://www.reddit.com" + childData['permalink'][:-1]
+            body = childData['selftext']
+            post = Post(title,body,url,flair,ups,downs)
+            posts.append(post)
+
+        if after is None:
+            break
+        
+        i = i+1
     return posts
 
 
@@ -102,6 +115,9 @@ def recursivelyGetReplies(data):
             replyList.extend(rList)
     return replyList
 
+
+
+
 outWorkbook = xlsxwriter.Workbook("out.xlsx")
 outSheet = outWorkbook.add_worksheet()
 
@@ -113,9 +129,15 @@ outSheet.write(0,3,"Comment Content")
 row = 1
 col = 0
 
-posts = getPosts()
+posts = getPosts("")
+print("get posts finished")
+
+count = 1
 
 for post in posts:
+    if count%20==0:
+        print("page no: %d" %(count))
+    count = count+1
     replies = getComments(post.url)
     for reply in replies:
         outSheet.write(row,col,post.url)
